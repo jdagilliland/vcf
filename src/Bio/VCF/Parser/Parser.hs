@@ -48,41 +48,58 @@ parsePatients = AC8.char '#' *>
                     BS8.words `fmap` takeTill endOfLine)
 
 parseChrom :: Parser B.ByteString
-parseChrom = try (string  "<ID>") <|> takeWhile1 notTabOrSpace
+parseChrom = try (string  "<ID>") <|>
+                  takeWhile1 notTabOrSpace
 
 {-We don't care about the additional characters, it should be delegated to
  - the whole parser-}
 parsePosition :: Parser Int
-parsePosition =  (read . BS8.unpack) `fmap` takeWhile1 isNumber
+parsePosition =  fmap (read . BS8.unpack) $
+                       takeWhile1 isNumber
 
 parseID :: Parser [B.ByteString]
-parseID = (BS8.split ':') `fmap` takeWhile1 notTabOrSpace
+parseID = fmap (BS8.split listSeparator) $
+                takeWhile1 notTabOrSpace
+  where listSeparator = ':'
 
 parseRef :: Parser B.ByteString
 parseRef = takeWhile1 isBase
 
 parseAlt :: Parser [B.ByteString]
 parseAlt = try (makeList `fmap` string "<ID>") <|>
-           (BS8.split ',') `fmap` takeWhile1 isBaseOrDeletion
+               (fmap (BS8.split listSeparator) $
+                      takeWhile1 isBaseOrDeletion)
   where makeList x = x : []
+        listSeparator = ','
 
 parseQual :: Parser (Maybe Float)
-parseQual = (readMaybe . BS8.unpack) `fmap` takeWhile1 isFloatNumber
+parseQual = fmap (readMaybe . BS8.unpack) $
+                  takeWhile1 isFloatNumber
 
 parseFilter :: Parser [B.ByteString]
 parseFilter = try (makeList `fmap` string "PASS") <|>
-              (BS8.split ';') `fmap` takeWhile1 notTabOrSpace
+                  (fmap (BS8.split listSeparator) $
+                         takeWhile1 notTabOrSpace)
   where makeList x = x : []
+        listSeparator = ';'
 
 parseInformation :: Parser [B.ByteString]
-parseInformation = (BS8.split ';') `fmap` takeWhile1 notTabOrSpace
+parseInformation = fmap (BS8.split listSeparator) $
+                         takeWhile1 notTabOrSpace
+  where listSeparator = ';'
 
 parseFormat :: Parser (Maybe [B.ByteString])
-parseFormat = try ((Just . BS8.split ':') `fmap` takeWhile1 notTabOrSpace) <|>
-                pure Nothing
+parseFormat = try (fmap (Just . BS8.split listSeparator) $
+                         takeWhile1 notTabOrSpace) <|>
+              pure Nothing
+  where listSeparator = ':'
 
 parseGenotypes :: Parser [Genotypes]
-parseGenotypes = ((fmap (BS8.split ':')) . BS8.split ' ') `fmap` takeByteString
+parseGenotypes = fmap ((fmap (BS8.split genotypesSepator)) .
+                        BS8.split patientSeparator) $
+                      takeByteString
+  where patientSeparator = ' '
+        genotypesSepator = ':'
 
 parseVariation :: Parser (Variation, [Genotypes])
 parseVariation = do
